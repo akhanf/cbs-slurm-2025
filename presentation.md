@@ -189,6 +189,8 @@ Remember to connect with `-X` for X11:
 ssh -X your_uwo_username@rri-cbs-slurm.fmd.uwo.pri
 ```
 
+---
+
 # Best Storage Practices
 
 **Typical Workflow:**
