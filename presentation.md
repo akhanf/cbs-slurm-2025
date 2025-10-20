@@ -139,13 +139,13 @@ sinfo
 module load python/3.13.2
 
 # Copy input data to local scratch (/tmp)
-cp /nfs/lab/myproject/data/input.csv /tmp
+cp /nfs/smith/myproject/data/input.csv /tmp
 
 # Run computation
 python myscript.py /tmp/input.csv > /tmp/results.txt
 
 # Copy results back to lab share
-cp /tmp/results.txt /nfs/lab/myproject
+cp /tmp/results.txt /nfs/smith/myproject
 ```
 
 ---
