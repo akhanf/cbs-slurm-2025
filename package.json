@@ -1,0 +1,23 @@
+{
+  "name": "cbs-slurm-presentation",
+  "version": "1.0.0",
+  "description": "CBS SLURM Cluster Introduction Presentation",
+  "scripts": {
+    "build": "marp presentation.md -o index.html",
+    "build:pdf": "marp presentation.md -o presentation.pdf",
+    "build:pptx": "marp presentation.md -o presentation.pptx",
+    "build:all": "npm run build && npm run build:pdf && npm run build:pptx",
+    "watch": "marp -w presentation.md -o index.html"
+  },
+  "keywords": [
+    "marp",
+    "presentation",
+    "slurm",
+    "hpc"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@marp-team/marp-cli": "^3.4.0"
+  }
+}
