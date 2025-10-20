@@ -12,16 +12,22 @@ footer: 'Computational Core - CBS'
 
 ## High-Performance Computing at CBS
 
+**7 high-performance compute nodes** with:
+- **128 CPU cores** each
+- **500+ GB RAM** per node
+- **2× NVIDIA L40S GPUs** per node
+- **7TB local SSD** per node
+
 ---
 
 # What is SLURM?
 
 **S**imple **L**inux **U**tility for **R**esource **M**anagement
 
-- Open-source workload manager
-- Job scheduling system
-- Resource allocation
-- Used by many supercomputers worldwide
+- A **job scheduler** that manages when, where, and how jobs run
+- Allocates resources (CPU, memory, GPU, time) fairly
+- Executes workloads on compute nodes
+- Ensures **fairness**, **efficiency**, and **stability** in multi-user environments
 
 ---
 
@@ -31,54 +37,63 @@ footer: 'Computational Core - CBS'
 - **Efficient job scheduling** and queuing
 - **Resource optimization** for better performance
 - **Job monitoring** and management
-- **Scalability** for large workloads
+- Work submitted as **batch jobs** or **interactive sessions**
 
 ---
 
-# Getting Started
+# Accessing the Cluster
 
-## Accessing the Cluster
-
-1. Connect via SSH
-2. Use your CBS credentials
-3. Check your environment
+Connect to the **master node**:
 
 ```bash
-# SSH connection
-ssh username@slurm.cbs.example.edu
-
-# Check your account
-sinfo
-squeue -u $USER
+ssh your_uwo_username@rri-cbs-slurm.fmd.uwo.pri
 ```
 
----
+⚠️ **NEVER run computations on the master node!**
+- Master node is only for **job submission, file management, and light setup**
+- All computational work must be submitted via SLURM
 
-# SLURM Architecture
-
-## Key Components
-
-- **Login Nodes**: Where you submit jobs
-- **Compute Nodes**: Where jobs run
-- **Head Node**: Manages the cluster
-
-⚠️ **Never run heavy computations on login nodes!**
+💡 **Access Requirements:**
+- Direct SSH only via CBS VDI servers or UWO network
+- Off-campus: Connect through CBS VDI servers
+- Use `-X` flag for X11 forwarding if needed
 
 ---
 
-# Understanding Partitions
+# Cluster Architecture
 
-Partitions are like queues with different resources:
+## Master Node
+**rri-cbs-slurm.fmd.uwo.pri** - SSH access, job submission only
+- 2× Intel® Xeon® Gold 6230R @ 2.10GHz
+- 8 GB Memory
 
-- **short**: Quick jobs (<4 hours)
-- **medium**: Standard jobs (<24 hours)
-- **long**: Extended jobs (<7 days)
-- **gpu**: GPU-accelerated jobs
-- **highmem**: High-memory jobs
+## Compute Nodes  
+**rri-cbs-h1** → **rri-cbs-h7** - Where jobs actually run
+- Intel® Xeon® Gold 6448Y (128 logical CPUs)
+- ~504 GB RAM
+- 2× NVIDIA L40S GPUs (46 GB each)
+- 7 TB SSD local scratch
+
+⚠️ **Never run heavy computations on the master node!**
+
+---
+
+# Submitting a Job
+
+Jobs are submitted using:
 
 ```bash
-sinfo -s  # View available partitions
+sbatch my_job_script.sh
 ```
+
+The script describes:
+1. Resources you need (CPUs, memory, GPUs, runtime)
+2. Commands to run
+
+⚠️ **Important Limits:**
+- **Maximum job time: 48 hours**
+- Design code with **checkpoints** for longer workflows
+- Interactive sessions limited to **5 hours**
 
 ---
 
@@ -92,63 +107,123 @@ sbatch my_script.sh
 squeue
 
 # View your jobs
-squeue -u $USER
+squeue -u your_uwo_username
 
 # Cancel a job
 scancel <job_id>
 
 # Job information
 scontrol show job <job_id>
+
+# Job history
+sacct -u your_uwo_username
+
+# List nodes
+sinfo
 ```
 
 ---
 
-# Job Script Basics
+# Job Script Template
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=my_job
-#SBATCH --time=01:00:00
-#SBATCH --mem=4G
+#SBATCH --job-name=myanalysis
+#SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=4
-#SBATCH --output=job_%j.out
-#SBATCH --error=job_%j.err
+#SBATCH --mem=16G
+#SBATCH --gpus-per-node=0
+#SBATCH --output=slurm-%j.out
 
-# Your commands here
-echo "Job started at $(date)"
-./my_program
-echo "Job finished at $(date)"
+# Load software modules
+module load python/3.13.2
+
+# Copy input data to local scratch (/tmp)
+cp /nfs/smith/myproject/data/input.csv /tmp
+
+# Run computation
+python myscript.py /tmp/input.csv > /tmp/results.txt
+
+# Copy results back to lab share
+cp /tmp/results.txt /nfs/smith/myproject
 ```
 
 ---
 
 # Resource Requests
 
-## Key Parameters
+## Key SBATCH Flags
 
-- `--time`: Maximum runtime (HH:MM:SS)
+- `--job-name`: Job name
+- `--time`: Runtime limit (max 48:00:00)
 - `--mem`: Memory per node (e.g., 8G, 16G)
 - `--cpus-per-task`: Number of CPU cores
-- `--nodes`: Number of nodes
-- `--partition`: Which queue to use
-- `--gres=gpu:1`: Request GPU resources
+- `--gpus-per-node`: Request GPU(s)
+- `--gpus-per-node=l40s:2`: Request specific GPUs
+- `--output`: Save output log (slurm-%j.out)
+
+💡 **GPU Types:**
+- Currently: `l40s` (NVIDIA L40S)
+- Coming soon: `a100` GPUs
 
 ---
 
 # Interactive Jobs
 
-For testing and debugging:
+For testing and debugging (max **5 hours**):
 
 ```bash
-# Start interactive session
-srun --pty --mem=4G --time=1:00:00 bash
+# Basic interactive session
+salloc --time=05:00:00 --nodes=1 --ntasks=1 \
+       --cpus-per-task=2 --mem=8G
 
-# Interactive with GPU
-srun --pty --gres=gpu:1 --mem=8G --time=2:00:00 bash
+# With GPU
+salloc --time=05:00:00 --gpus-per-node=1
 
-# Exit when done
-exit
+# With X11 forwarding (for GUI apps)
+salloc --time=05:00:00 --mem=8G --x11
 ```
+
+Remember to connect with `-X` for X11:
+```bash
+ssh -X your_uwo_username@rri-cbs-slurm.fmd.uwo.pri
+```
+
+# Best Storage Practices
+
+**Typical Workflow:**
+
+1. **Copy data** from `/nfs/<pi_last_name>` or `/nfs/scratch` to `/tmp`
+2. **Process data** using `/tmp` (fastest I/O)
+3. **Checkpoint** outputs periodically to `/nfs/scratch` (optional but recommended)
+4. **Copy final results** from `/tmp` back to `/nfs/<pi_last_name>` before job exits
+
+💡 **Remember:** `/tmp` is deleted when your job completes!
+
+📧 **Request Storage:** Contact support-cbs-server@uwo.ca for lab shares
+
+---
+
+# Software Modules (Lmod)
+
+The cluster uses **modules** to manage software:
+
+```bash
+# List available software
+module avail
+
+# Load a module
+module load freesurfer/7.4.1
+module load python/3.13.2
+
+# Check loaded modules
+module list
+
+# Unload a module
+module unload freesurfer/7.4.1
+```
+
+Load modules in your job script or interactive session to access software.
 
 ---
 
@@ -156,102 +231,64 @@ exit
 
 ```bash
 # Check job status
-squeue -u $USER
+squeue -u your_uwo_username
 
 # Detailed job info
 scontrol show job <job_id>
 
 # Job history
-sacct -u $USER
+sacct -u your_uwo_username
 
-# Job efficiency report
-seff <job_id>
+# List cluster nodes
+sinfo
 ```
 
 ---
 
-# Output and Error Files
+# Using kslurm Wrapper
 
-By default:
-- `slurm-<job_id>.out` - Standard output
-- Customize with `--output` and `--error`
+[**kslurm**](https://kslurm.readthedocs.io/en/latest/) simplifies SLURM commands:
 
+**kbatch** - Batch submission (no script needed):
 ```bash
-#SBATCH --output=logs/job_%j.out
-#SBATCH --error=logs/job_%j.err
+# 12hr job, 16 cores, 24GB memory
+kbatch 12:00 16 24G recon-all <recon-all-args>
 ```
 
-Use `%j` for job ID, `%x` for job name
-
----
-
-# Environment Modules
-
-Load software with modules:
-
+**krun** - Interactive session:
 ```bash
-# List available modules
-module avail
-
-# Load a module
-module load python/3.9
-
-# List loaded modules
-module list
-
-# Unload a module
-module unload python/3.9
+# 4 cores, 3hr, 15GB memory, with GPU
+krun 4 3:00 15G gpu
 ```
 
----
+No need for confusing `--arguments` or script files!
 
-# Array Jobs
-
-Run multiple similar jobs efficiently:
-
-```bash
-#!/bin/bash
-#SBATCH --array=1-10
-#SBATCH --job-name=array_job
-
-# Use $SLURM_ARRAY_TASK_ID
-echo "Processing task $SLURM_ARRAY_TASK_ID"
-./process_file_${SLURM_ARRAY_TASK_ID}.sh
-```
-
----
-
-# Dependencies
-
-Chain jobs together:
-
-```bash
-# Submit first job
-job1=$(sbatch --parsable first_job.sh)
-
-# Submit dependent job
-sbatch --dependency=afterok:$job1 second_job.sh
-```
-
-Dependency types: `afterok`, `afterany`, `afternotok`
+See full [documentation](https://kslurm.readthedocs.io/en/latest/) for details.
 
 ---
 
 # GPU Jobs
 
+Request GPUs in your job script:
+
 ```bash
 #!/bin/bash
-#SBATCH --partition=gpu
-#SBATCH --gres=gpu:1
+#SBATCH --job-name=gpu_job
+#SBATCH --gpus-per-node=1
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=4
+#SBATCH --time=12:00:00
 
-# Load CUDA module
-module load cuda/11.8
+# Load required modules
+module load cuda/12.8
 
 # Run GPU program
 ./my_cuda_program
 ```
+
+**GPU Types:**
+- Currently: `l40s` (2× per node, 46GB each)
+- Coming: `a100` GPUs
 
 ---
 
@@ -259,26 +296,56 @@ module load cuda/11.8
 
 ✅ **DO:**
 - Request only resources you need
-- Test with short jobs first
-- Use array jobs for similar tasks
-- Monitor job efficiency with `seff`
-- Clean up old output files
+- Use `/tmp` for fast I/O operations
+- Copy data to `/tmp` before processing
+- Design code with checkpoints (48hr max)
+- Save results before job completes
+- Use kslurm for simplified commands
 
 ❌ **DON'T:**
-- Run computations on login nodes
-- Request excessive resources
-- Submit thousands of tiny jobs
-- Leave interactive sessions idle
+- Run computations on master node
+- Exceed 48 hours (batch) or 5 hours (interactive)
+- Leave data in `/tmp` (it's deleted!)
+- Forget to copy results back to `/nfs/...`
 
 ---
 
-# Storage Considerations
+# Storage: Data Locations
 
-- **Home**: `/home/$USER` (backed up, limited quota)
-- **Scratch**: `/scratch/$USER` (large, temporary)
-- **Project**: `/project/group_name` (shared storage)
+## 🔒 Lab Shares: `/nfs/<pi_last_name>`
+- Dedicated fileshare for project data
+- Accessible from all compute nodes
+- Stored on 2025 OneFS fileserver
 
-⚠️ Files in `/scratch` may be deleted after 30 days
+## 📂 Shared Scratch: `/nfs/scratch`
+- 25 TB shared temporary space
+- For staging input/output data
+- ⚠️ Files deleted after **30 days**
+- **Not backed up**
+
+## ⚡ Local Scratch: `/tmp`
+- 7TB fast SSD per compute node
+- Private to your job, auto-created
+- **Deleted when job completes**
+- Fastest option for I/O intensive work
+
+---
+
+# Access & Billing
+
+## Access Requirements
+- **CBS SLURM is for Power users only**
+- Direct SSH via CBS VDI or UWO network
+- Off-campus: Connect through CBS VDI servers
+
+## Storage
+- Only supports OneFS storage (`/nfs/...`)
+- Legacy `/cifs/...` shares not accessible from compute nodes
+- Contact support-cbs-server@uwo.ca for lab shares
+
+## Resources
+- [CBS Servers Documentation](https://hackmd.io/@CompCore/cbs_servers)
+- [CBS Storage Guide](https://hackmd.io/@CompCore/cbs_storage)
 
 ---
 
@@ -286,60 +353,73 @@ module load cuda/11.8
 
 ## Common Issues
 
-- **Job pending**: Check resource availability
+- **Job pending**: Check resource availability with `sinfo`
 - **Out of memory**: Increase `--mem`
-- **Time limit**: Increase `--time`
-- **Job failed**: Check error logs
+- **Time limit exceeded**: Increase `--time` (max 48:00:00)
+- **Job failed**: Check output logs (`slurm-<job_id>.out`)
+- **Cannot access data**: Ensure using `/nfs/...` not `/cifs/...`
 
 ```bash
 # Why is my job pending?
-squeue -j <job_id> --start
+squeue -u your_uwo_username
 ```
 
 ---
 
-# Getting Help
+# Additional Resources
 
-## Resources
+## Documentation
+- [Alliance Canada - What is a scheduler?](https://docs.alliancecan.ca/wiki/What_is_a_scheduler)
+- [Alliance Canada - Running jobs](https://docs.alliancecan.ca/wiki/Running_jobs)
+- [Alliance Canada - Using GPUs with Slurm](https://docs.alliancecan.ca/wiki/Using_GPUs_with_Slurm)
+- [Alliance Canada - MATLAB](https://docs.alliancecan.ca/wiki/MATLAB)
+- [kslurm Documentation](https://kslurm.readthedocs.io/en/latest/)
 
-- Documentation: Check cluster wiki/docs
-- Example scripts: `/opt/examples/`
-- Support: Email support team
-- Office hours: Check schedule
-
-```bash
-# Check cluster status
-sinfo
-
-# Contact info in MOTD
-cat /etc/motd
-```
+## CBS Resources
+- [CBS Servers Guide](https://hackmd.io/@CompCore/cbs_servers)
+- [CBS Storage Guide](https://hackmd.io/@CompCore/cbs_storage)
 
 ---
 
 # Quick Reference
 
 ```bash
-sbatch script.sh          # Submit batch job
-srun command              # Run interactive job
-squeue                    # View queue
-scancel <job_id>          # Cancel job
-sinfo                     # Cluster info
-sacct                     # Job history
-seff <job_id>             # Job efficiency
-module avail/load/list    # Software modules
+# Job Submission
+sbatch script.sh              # Submit batch job
+salloc --time=5:00:00 ...     # Interactive session (max 5hr)
+kbatch 12:00 16 24G command   # kslurm batch
+krun 4 3:00 15G gpu           # kslurm interactive
+
+# Monitoring
+squeue -u your_uwo_username   # Your jobs
+sinfo                         # Cluster status
+sacct -u your_uwo_username    # Job history
+scancel <job_id>              # Cancel job
+
+# Software & Storage
+module avail/load/list        # Manage software
+/nfs/<pi_last_name>           # Lab share
+/nfs/scratch                  # Temporary (30 days)
+/tmp                          # Fast local (deleted on exit)
 ```
 
 ---
 
 # Next Steps
 
-1. **Log in** to the cluster
-2. **Run a test job** (start small!)
-3. **Review your job efficiency** with `seff`
-4. **Explore modules** for your software
-5. **Read the documentation** for advanced features
-6. **Ask for help** when needed
+1. **Connect** to the cluster
+   ```bash
+   ssh your_uwo_username@rri-cbs-slurm.fmd.uwo.pri
+   ```
+2. **Check** available resources
+   ```bash
+   sinfo
+   module avail
+   ```
+3. **Submit** a test job (start small!)
+4. **Monitor** your job with `squeue -u your_uwo_username`
+5. **Read** the documentation and explore kslurm
+6. **Contact** support-cbs-server@uwo.ca for help
 
 ---
 
@@ -348,8 +428,9 @@ module avail/load/list    # Software modules
 ## Thank You!
 
 **Contact Information:**
-- Email: support@cbs.example.edu
-- Documentation: https://docs.cbs.example.edu
-- Office Hours: Wednesdays 2-4 PM
+- 📧 Email: support-cbs-server@uwo.ca
+- 📚 Documentation: 
+  - [CBS Servers](https://hackmd.io/@CompCore/cbs_servers)
+  - [Alliance Canada SLURM Docs](https://docs.alliancecan.ca/wiki/What_is_a_scheduler)
 
 **Happy Computing! 🚀**
