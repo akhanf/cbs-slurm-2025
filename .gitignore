@@ -1,0 +1,21 @@
+# Node modules
+node_modules/
+package-lock.json
+
+# Build outputs
+index.html
+*.pdf
+*.pptx
+public/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.log
